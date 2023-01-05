@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/crc32"
-	"strings"
+	"log"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
@@ -74,7 +74,7 @@ func (k *SecretManager) Configure(ctx context.Context) error {
 }
 
 func (k *SecretManager) SaveSecretBinary(ctx context.Context, key string, secret []byte) error {
-	name := k.toName(ctx, key, "")
+	name := k.toName(ctx, key)
 
 	// So GCP is a bit stupid here. They require that you "create" a secret first and then
 	// set a secret version. This means we first have to "Get" the secret to see if
@@ -92,10 +92,16 @@ func (k *SecretManager) SaveSecretBinary(ctx context.Context, key string, secret
 
 	if s == nil {
 		// Secret is not there so we need to create it
-		s, err = k.Client.CreateSecret(ctx, &secretmanagerpb.CreateSecretRequest{
-			Parent:   k.Project,
+		_, err = k.Client.CreateSecret(ctx, &secretmanagerpb.CreateSecretRequest{
+			Parent:   "projects/" + k.Project,
 			SecretId: key,
-			Secret:   &secretmanagerpb.Secret{},
+			Secret: &secretmanagerpb.Secret{
+				Replication: &secretmanagerpb.Replication{
+					Replication: &secretmanagerpb.Replication_Automatic_{
+						Automatic: &secretmanagerpb.Replication_Automatic{},
+					},
+				},
+			},
 		})
 
 		if err != nil {
@@ -104,7 +110,7 @@ func (k *SecretManager) SaveSecretBinary(ctx context.Context, key string, secret
 	}
 
 	addSecretVersionReq := &secretmanagerpb.AddSecretVersionRequest{
-		Parent: s.Name,
+		Parent: name,
 		Payload: &secretmanagerpb.SecretPayload{
 			Data: secret,
 		},
@@ -115,7 +121,7 @@ func (k *SecretManager) SaveSecretBinary(ctx context.Context, key string, secret
 }
 
 func (k *SecretManager) GetSecretBinary(ctx context.Context, key string) ([]byte, error) {
-	name := k.toName(ctx, key, "latest")
+	name := k.toNameVersion(ctx, key, "latest")
 
 	resp, err := k.Client.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{
 		Name: name,
@@ -153,7 +159,7 @@ func (k *SecretManager) SaveSecret(ctx context.Context, key string, data string)
 }
 
 func (k *SecretManager) DeleteSecret(ctx context.Context, key string) error {
-	name := k.toName(ctx, key, "")
+	name := k.toName(ctx, key)
 	err := k.Client.DeleteSecret(ctx, &secretmanagerpb.DeleteSecretRequest{
 		Name: name,
 	})
@@ -162,8 +168,10 @@ func (k *SecretManager) DeleteSecret(ctx context.Context, key string) error {
 }
 
 func (k *SecretManager) IsNotFound(err error) bool {
-	str := err.Error()
-	return strings.Contains(str, "SecretNotFound")
+	// Not sure yet
+	log.Printf("Potential Error: %v\n", err)
+
+	return true
 }
 
 func sanitizeName(secretName string) string {
@@ -172,7 +180,14 @@ func sanitizeName(secretName string) string {
 }
 
 // Format projects/my-project/secrets/my-secret/versions/5
-func (k *SecretManager) toName(ctx context.Context, key string, version string) string {
+func (k *SecretManager) toName(ctx context.Context, key string) string {
+	key = sanitizeName(key)
+
+	return fmt.Sprintf("projects/%v/secrets/%v", k.Project, key)
+}
+
+// Format projects/my-project/secrets/my-secret/versions/5
+func (k *SecretManager) toNameVersion(ctx context.Context, key string, version string) string {
 	key = sanitizeName(key)
 	if version == "" {
 		version = "latest"
