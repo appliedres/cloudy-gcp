@@ -12,11 +12,11 @@ import (
 	"github.com/appliedres/cloudy/secrets"
 )
 
-const GcpSecretsManager = "gcp-secrets"
-const SecretManagerCachedId = "gcp-secrets-cached"
+const GoogleSecretsManager = "gcp-secrets"
+const GoogleSecretsManagerCached = "gcp-secrets-cached"
 
 func init() {
-	secrets.SecretProviders.Register(GcpSecretsManager, &SecretManagerFactory{})
+	secrets.SecretProviders.Register(GoogleSecretsManager, &SecretManagerFactory{})
 }
 
 type SecretManagerFactory struct{}
