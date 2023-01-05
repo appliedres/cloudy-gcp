@@ -9,10 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestKeyVault(t *testing.T) {
+func TestSecretManager(t *testing.T) {
 
 	ctx := cloudy.StartContext()
-
 	sm, err := NewSecretManager(ctx, "arklouddev", GcpCredentials{})
 	assert.Nil(t, err)
 	if err != nil {
