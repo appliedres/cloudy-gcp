@@ -6,6 +6,7 @@ import (
 	"hash/crc32"
 	"strings"
 
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"github.com/appliedres/cloudy"
 	"github.com/appliedres/cloudy/secrets"
@@ -22,8 +23,7 @@ type SecretManagerFactory struct{}
 
 type SecretManagerConfig struct {
 	GcpCredentials
-	Project  string
-	VaultURL string `cloudyenv:"AZ_VAULT_URL"`
+	Project string
 }
 
 func (c *SecretManagerFactory) Create(cfg interface{}) (secrets.SecretProvider, error) {
@@ -31,20 +31,20 @@ func (c *SecretManagerFactory) Create(cfg interface{}) (secrets.SecretProvider, 
 	if sec == nil {
 		return nil, cloudy.ErrInvalidConfiguration
 	}
-	return NewSecretManager(context.Background(), sec.VaultURL, sec.GcpCredentials)
+	return NewSecretManager(context.Background(), sec.Project, sec.GcpCredentials)
 }
 
 func (c *SecretManagerFactory) FromEnv(env *cloudy.Environment) (interface{}, error) {
 	cfg := &SecretManagerConfig{}
-	cfg.VaultURL = env.Force("AZ_VAULT_URL")
-	cfg.GcpCredentials = GetCredentialsFromEnv(env)
+	cfg.Project = env.Force("GCP_PROJECT")
+	cfg.GcpCredentials = GetCredentialsFromEnv()
 	return cfg, nil
 }
 
 type SecretManager struct {
 	GcpCredentials
 	Project string
-	Client  secretmanagerpb.SecretManagerServiceClient
+	Client  *secretmanager.Client
 }
 
 func NewSecretManager(ctx context.Context, project string, credentials GcpCredentials) (*SecretManager, error) {
@@ -58,12 +58,16 @@ func NewSecretManager(ctx context.Context, project string, credentials GcpCreden
 
 func (k *SecretManager) Configure(ctx context.Context) error {
 
-	cred, err := GetCredentials(k.GcpCredentials)
+	// cred, err := GetCredentials(k.GcpCredentials)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// client := secretmanagerpb.NewSecretManagerServiceClient(creds)
+	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
 		return err
 	}
-
-	client := secretmanagerpb.NewSecretManagerServiceClient(creds)
 
 	k.Client = client
 	return nil
@@ -91,13 +95,7 @@ func (k *SecretManager) SaveSecretBinary(ctx context.Context, key string, secret
 		s, err = k.Client.CreateSecret(ctx, &secretmanagerpb.CreateSecretRequest{
 			Parent:   k.Project,
 			SecretId: key,
-			Secret: &secretmanagerpb.Secret{
-				Replication: &secretmanagerpb.Replication{
-					&secretmanagerpb.Replication_Automatic_{
-						Automatic: &secretmanagerpb.Replication_Automatic{},
-					},
-				},
-			},
+			Secret:   &secretmanagerpb.Secret{},
 		})
 
 		if err != nil {
@@ -134,7 +132,7 @@ func (k *SecretManager) GetSecretBinary(ctx context.Context, key string) ([]byte
 	crc32c := crc32.MakeTable(crc32.Castagnoli)
 	checksum := int64(crc32.Checksum(resp.Payload.Data, crc32c))
 	if checksum != *resp.Payload.DataCrc32C {
-		return cloudy.Error(ctx, "Data corruption detected in secret %v", key)
+		return nil, cloudy.Error(ctx, "Data corruption detected in secret %v", key)
 	}
 
 	secretData := resp.Payload.Data
@@ -155,8 +153,9 @@ func (k *SecretManager) SaveSecret(ctx context.Context, key string, data string)
 }
 
 func (k *SecretManager) DeleteSecret(ctx context.Context, key string) error {
-	_, err := k.Client.DeleteSecret(ctx, &secretmanagerpb.DeleteSecretRequest{
-		Name: k.toName(ctx, key, ""),
+	name := k.toName(ctx, key, "")
+	err := k.Client.DeleteSecret(ctx, &secretmanagerpb.DeleteSecretRequest{
+		Name: name,
 	})
 
 	return err
