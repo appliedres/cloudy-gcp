@@ -23,7 +23,7 @@ func (c *SecretManagerEnvironmentFactory) Create(cfg interface{}) (cloudy.Enviro
 	if sec == nil {
 		return nil, cloudy.ErrInvalidConfiguration
 	}
-	kve, err := NewSecretManagerEnvironmentService(context.Background(), sec.VaultURL, sec.AzureCredentials, sec.Prefix)
+	kve, err := NewSecretManagerEnvironmentService(context.Background(), sec.Project, sec.Prefix)
 	return kve, err
 }
 

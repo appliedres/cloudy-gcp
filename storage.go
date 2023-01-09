@@ -18,7 +18,7 @@ const GoogleCloudStorageDriver = "gcp-storage"
 var GoogleCloudStorageLabelRegExValue = regexp.MustCompile("^[a-z-_]*$")
 
 func init() {
-	cloudystorage.ObjectStorageProviders.Register(GcpSecretsManager, &GoogleCloudStorageFactory{})
+	cloudystorage.ObjectStorageProviders.Register(GoogleCloudStorageDriver, &GoogleCloudStorageFactory{})
 }
 
 type GoogleCloudStorage struct {
