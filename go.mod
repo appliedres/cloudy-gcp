@@ -7,7 +7,7 @@ replace github.com/appliedres/cloudy => ../cloudy
 require (
 	cloud.google.com/go/secretmanager v1.9.0
 	cloud.google.com/go/storage v1.28.1
-	github.com/appliedres/cloudy v0.0.7
+	github.com/appliedres/cloudy v0.0.11
 	github.com/stretchr/testify v1.8.2
 	google.golang.org/api v0.105.0
 )
