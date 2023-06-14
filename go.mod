@@ -2,8 +2,6 @@ module github.com/appliedres/cloudy-gcp
 
 go 1.19
 
-replace github.com/appliedres/cloudy => ../cloudy
-
 require (
 	cloud.google.com/go/secretmanager v1.9.0
 	cloud.google.com/go/storage v1.28.1
